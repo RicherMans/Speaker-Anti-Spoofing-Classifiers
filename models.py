@@ -1,6 +1,4 @@
 from itertools import zip_longest
-import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -58,12 +56,13 @@ class LightCNN(nn.Module):
     def __init__(self, inputdim, outputdim, **kwargs):
         super().__init__()
         self._filtersizes = kwargs.get('filtersizes', [3, 3, 3, 3, 3, 3, 3])
-        self._filter = kwargs.get('filter', [16, 48, 96, 128, 256, 512, 1024])
+        self._filter = [1] + kwargs.get('filter',
+                                        [16, 48, 96, 128, 256, 512, 1024])
         self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2, (1, 2)])
         net = nn.ModuleList()
         for nl, (h0, h1, filtersize, poolingsize) in enumerate(
-                zip_longest([1] + self._filter, self._filter,
-                            self._filtersizes, self._pooling)):
+                zip_longest(self._filter, self._filter, self._filtersizes,
+                            self._pooling)):
             # Stop in zip_longest when last element arrived
             if not h1:
                 break

@@ -1,24 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import collections
 import logging
 import sys
 from pprint import pformat
 
 import numpy as np
 import pandas as pd
-import sklearn.preprocessing as pre
-import augment
-import tqdm
-import collections
-import scipy
-import yaml
-from dcase_util.data import DecisionEncoder
 import six
+import sklearn.preprocessing as pre
 import torch
+import yaml
 
-import dataset
-
+import augment
 
 def parse_config_or_kwargs(config_file, **kwargs):
     """parse_config_or_kwargs
@@ -118,22 +112,3 @@ def encode_labels(labels: pd.Series, encoder=None):
         encoder.fit(label_array)
     labels_encoded = encoder.transform(label_array)
     return labels_encoded.astype(np.float32).tolist(), encoder
-
-
-
-
-def estimate_scaler(dataloader, **scaler_args):
-
-    scaler = pre.StandardScaler(**scaler_args)
-    with tqdm.tqdm(total=len(dataloader),
-                   unit='batch',
-                   leave=False,
-                   desc='Estimating Scaler') as pbar:
-        for batch in dataloader:
-            feature = batch[0]
-            # Flatten time and batch dim to one
-            feature = feature.reshape(-1, feature.shape[-1])
-            pbar.set_postfix(feature=feature.shape)
-            pbar.update()
-            scaler.partial_fit(feature)
-    return scaler

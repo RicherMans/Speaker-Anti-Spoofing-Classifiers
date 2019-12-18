@@ -1,28 +1,31 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
+import csv  # For writing the scores
 import datetime
-
-import uuid
 import glob
-import fire
+import uuid
+from pathlib import Path
 
+import fire
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
 from ignite.handlers import EarlyStopping, ModelCheckpoint
-from ignite.metrics import Accuracy, Loss, RunningAverage, Precision, Recall
+from ignite.metrics import Accuracy, Loss, Precision, Recall, RunningAverage
 from tabulate import tabulate
+from tqdm import tqdm
 
 import dataset
+import evaluation.eval_metrics as em
+import metrics
 import models
 import utils
-import metrics
 
 DEVICE = 'cpu'
+# Fix for cluster runs... some partitions support GPU even if you submit to CPU
 if torch.cuda.is_available(
 ) and 'SLURM_JOB_PARTITION' in os.environ and 'gpu' in os.environ[
         'SLURM_JOB_PARTITION']:
@@ -61,11 +64,11 @@ class Runner(object):
         """
 
         config_parameters = utils.parse_config_or_kwargs(config, **kwargs)
-        outputdir = os.path.join(
+        outputdir = Path(
             config_parameters['outputpath'], config_parameters['model'],
             "{}_{}".format(
                 datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%m'),
-                uuid.uuid1().hex))
+                uuid.uuid1().hex[:8]))
         # Early init because of creating dir
         checkpoint_handler = ModelCheckpoint(
             outputdir,
@@ -76,7 +79,7 @@ class Runner(object):
             score_function=lambda engine: -engine.state.metrics['Loss'],
             save_as_state_dict=False,
             score_name='loss')
-        logger = utils.getfile_outlogger(os.path.join(outputdir, 'train.log'))
+        logger = utils.getfile_outlogger(Path(outputdir, 'train.log'))
         logger.info("Storing files in {}".format(outputdir))
         # utils.pprint_dict
         utils.pprint_dict(config_parameters, logger.info)
@@ -87,7 +90,7 @@ class Runner(object):
         if not np.issubdtype(labels_df['filename'].dtype, np.number):
             # if not labels_df['filename'].isnumeric():
             labels_df.loc[:, 'filename'] = labels_df['filename'].apply(
-                os.path.basename)
+                lambda x: Path(x).name)
         labels_df['encoded'], encoder = utils.encode_labels(
             labels=labels_df['event_labels'])
         train_df, cv_df = utils.split_train_cv(
@@ -159,23 +162,6 @@ class Runner(object):
         criterion = torch.nn.CrossEntropyLoss().to(DEVICE)
         model = model.to(DEVICE)
 
-        def _train_batch(_, batch):
-            model.train()
-            with torch.enable_grad():
-                optimizer.zero_grad()
-                clip_level_output, time_level_output, targets = self._forward(
-                    model, batch)
-                loss = criterion(clip_level_output, targets)
-                loss.backward()
-                optimizer.step()
-                return loss.item()
-
-        def _inference(_, batch):
-            model.eval()
-            with torch.no_grad():
-                clip_level_output, _, targets = self._forward(model, batch)
-                return clip_level_output, targets
-
         precision = Precision()
         recall = Recall()
         f1_score = (precision * recall * 2 / (precision + recall)).mean()
@@ -224,7 +210,7 @@ class Runner(object):
                                            })
 
         @train_engine.on(Events.EPOCH_COMPLETED)
-        def compute_metrics(engine):
+        def compute_validation_metrics(engine):
             inference_engine.run(cvdataloader)
             results = inference_engine.state.metrics
             output_str_list = [
@@ -239,8 +225,13 @@ class Runner(object):
         train_engine.run(trainloader, max_epochs=config_parameters['epochs'])
         return outputdir
 
-    def evaluate(self, experiment_path: str, result_file: str, **kwargs):
-        """evaluate
+    def score(self, experiment_path: str, result_file: str, **kwargs):
+        """score
+        Scores a given experiemnt path e.g., outputs probability scores
+        for a given dataset passed as:
+            --data features/hdf5/somedata.h5
+            --label features/labels/somedata.csv
+
 
         :param experiment_path: Path to already trained model using train
         :type experiment_path: str
@@ -257,65 +248,140 @@ class Runner(object):
         encoder = torch.load(glob.glob(
             '{}/run_encoder*'.format(experiment_path))[0],
                              map_location=lambda storage, loc: storage)
-        strong_labels_df = pd.read_csv(config_parameters['label'], sep='\t')
+        labels_df = pd.read_csv(config_parameters['label'])
 
-        # Evaluation is done via the filenames, not full paths
-        if not np.issubdtype(strong_labels_df['filename'].dtype, np.number):
-            strong_labels_df['filename'] = strong_labels_df['filename'].apply(
-                os.path.basename)
-        if 'audiofilepath' in strong_labels_df.columns:  # In case of ave dataset, the audiofilepath column is the main column
-            strong_labels_df['audiofilepath'] = strong_labels_df[
-                'audiofilepath'].apply(os.path.basename)
-            colname = 'audiofilepath'  # AVE
-        else:
-            colname = 'filename'  # Dcase etc.
-        # Problem is that we iterate over the strong_labels_df, which is ambigious
-        # In order to conserve some time and resources just reduce strong_label to weak_label format
-        weak_labels_df = strong_labels_df.groupby(colname)[
-            'event_label'].unique().apply(tuple).to_frame().reset_index()
-        if "event_labels" in strong_labels_df.columns:
-            assert False, "Data with the column event_labels are used to train not to evaluate"
-        weak_labels_df['encoded'], encoder = utils.encode_labels(
-            labels=weak_labels_df['event_label'], encoder=encoder)
+        labels_df['encoded'], encoder = utils.encode_labels(
+            labels=labels_df['event_label'], encoder=encoder)
         config_parameters.setdefault('colname', ('filename', 'encoded'))
         dataloader = dataset.getdataloader(
-            weak_labels_df,
+            labels_df,
             config_parameters['data'],
-            batch_size=1,
+            batch_size=1,  # do not apply any padding
             colname=config_parameters[
                 'colname']  # For other datasets with different key names
         )
         model = model.to(DEVICE).eval()
-        time_predictions, clip_predictions = [], []
-        sequences_to_save = []
-        with torch.no_grad():
+
+        with torch.no_grad(), open(result_file,
+                                   'w') as wp, tqdm(total=len(dataloader),
+                                                    unit='data'):
+            datawriter = csv.writer(wp)
             for batch in dataloader:
-                _, _, filenames = batch
-                clip_pred, pred, _ = self._forward(model, batch)
+                preds, filenames = self._forward(model, batch)
+                for pred, filename in zip(preds, filenames):
+                    # Single batchsize
+                    datawriter.writerow([filename, pred[0].item()])
+        print("Score file can be found at {}".format(result_file))
 
     def train_evaluate(self, config, test_data, test_label, **kwargs):
+        """train_evaluate
+
+        :param config: Config for training and evaluation
+            :param data: pass --data for trainingdata (HDF5)
+            :param label: pass --label for training labels
+        :param test_data: Data to use for testing (HDF5)
+        :param test_label:
+        :param **kwargs:
+        """
         experiment_path = self.train(config, **kwargs)
-        import h5py
-        # Get the output time-ratio factor from the model
-        model = torch.load(glob.glob(
-            "{}/run_model*".format(experiment_path))[0],
-                           map_location=lambda storage, loc: storage)
-        # Dummy to calculate the pooling factor a bit dynamic
-        with h5py.File(test_data, 'r') as store:
-            data_dim = next(iter(store.values())).shape[-1]
-        dummy = torch.randn(1, 501, data_dim)
-        _, time_out = model(dummy)
-        time_ratio = max(0.02, 0.02 * (dummy.shape[1] // time_out.shape[1]))
-        # Parse for evaluation ( if any )
-        config_parameters = utils.parse_config_or_kwargs(config, **kwargs)
-        threshold = config_parameters.get('threshold', None)
-        postprocessing = config_parameters.get('postprocessing', 'double')
-        self.evaluate(experiment_path,
-                      label=test_label,
-                      data=test_data,
-                      time_ratio=time_ratio,
-                      postprocessing=postprocessing,
-                      threshold=threshold)
+        scores_file = Path(experiment_path,
+                           'scores_' + Path(test_data).stem + '.txt')
+        self.score(experiment_path,
+                   result_file=scores_file,
+                   label=test_label,
+                   data=test_data)
+        self.evaluate_eer(scores_file)
+
+    def evaluate_eer(self,
+                     scores_file,
+                     evaluation_res_file: str = None,
+                     return_cm=False):
+        # Directly run the evaluation
+        df = pd.read_csv(
+            scores_file,
+            names=['filename', 'spooftype', 'binarytype', 'score'])
+        spoof_cm = df[df['target'] == 'spoof']
+        bona_cm = df[df['target'] == 'bonafide']
+        eer_cm = em.compute_eer(bona_cm, spoof_cm)[0]
+        result_string = "EER = {:8.5f} % (Equal error rate for Spoofing detection)".format(
+            eer_cm * 100)
+        if evaluation_res_file:  #Save to file
+            with open(evaluation_res_file, 'w') as fp:
+                print(
+                    "EER = {:8.5f} % (Equal error rate for Spoofing detection)"
+                    .format(eer_cm * 100),
+                    file=fp)
+        print(
+            f"Evaluation results are at {evaluation_res_file}\n Prediction scores are at {scores_file}"
+        )
+        # For evaluate_tDCF in order to avoid too many prints
+        if return_cm:
+            return spoof_cm, bona_cm, eer_cm
+
+    def evaluate_tDCF(self, cm_scores_file: str, asv_scores_file: str,
+                      evaluation_res_file: str):
+        """evaluate_tDCF
+
+        :param cm_scores_file: Spoofing results 
+        :type cm_scores_file: str
+        :param asv_scores_file: Given by the challenge, asv17
+        :type asv_scores_file: str
+        :param evaluation_res_file:
+        :type evaluation_res_file: str
+        """
+
+        # Spoofing related EER
+        bona_cm, spoof_cm, eer_cm = self.evaluate_eer(cm_scores_file,
+                                                      return_cm=True)
+
+        asv_df = pd.read_csv(asv_scores_file)
+        tar_asv = asv_df[asv_df['target'] == 'target']
+        non_tar_asv = asv_df[asv_df['target'] == 'nontarget']
+        spoof_asv = asv_df[asv_df['target'] == 'spoof']
+
+        eer_asv, asv_threshold = em.compute_eer(tar_asv, non_tar_asv)
+        [Pfa_asv, Pmiss_asv,
+         Pmiss_spoof_asv] = em.obtain_asv_error_rates(tar_asv, non_tar_asv,
+                                                      spoof_asv, asv_threshold)
+        # Default values from ASVspoof2019
+        Pspoof = 0.05
+        cost_model = {
+            'Pspoof': Pspoof,  # Prior probability of a spoofing attack
+            'Ptar': (1 - Pspoof) * 0.99,  # Prior probability of target speaker
+            'Pnon':
+            (1 - Pspoof) * 0.01,  # Prior probability of nontarget speaker
+            'Cmiss_asv':
+            1,  # Cost of ASV system falsely rejecting target speaker
+            'Cfa_asv':
+            10,  # Cost of ASV system falsely accepting nontarget speaker
+            'Cmiss_cm':
+            1,  # Cost of CM system falsely rejecting target speaker
+            'Cfa_cm': 10,  # Cost of CM system falsely accepting spoof
+        }
+        tDCF_curve, CM_thresholds = em.compute_tDCF(bona_cm, spoof_cm, Pfa_asv,
+                                                    Pmiss_asv, Pmiss_spoof_asv,
+                                                    cost_model, True)
+        min_tDCF_index = np.argmin(tDCF_curve)
+        min_tDCF = tDCF_curve[min_tDCF_index]
+
+        result_string = f"""
+        ASV System
+            EER = {eer_asv*100:<8.5f} (Equal error rate (target vs. nontarget)
+            Pfa = {Pfa_asv*100:<8.5f} (False acceptance rate)
+            Pmiss = {Pmiss_asv*100:<8.5f} (False rejection rate) 
+            1-Pmiss, spoof = {(1-Pmiss_asv)*100:<8.5f} (Spoof false acceptance rate)
+        
+        CM System
+            EER = {eer_cm*100:<8.5f} (Equal error rate for counter measure)
+
+        Tandem
+            min-tDCF = {min_tDCF:<8.f}
+        """
+
+        print(result_string)
+        if evaluation_res_file:
+            with open(evaluation_res_file, 'w') as wp:
+                print(result_string, file=wp)
 
 
 if __name__ == "__main__":
