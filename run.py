@@ -50,7 +50,7 @@ class Runner(object):
     @staticmethod
     def _forward(model, batch):
         inputs, targets, filenames = batch
-        inputs, targets = inputs.float().to(DEVICE), targets.float().to(DEVICE)
+        inputs, targets = inputs.float().to(DEVICE), targets.long().to(DEVICE)
         outputs = model(inputs)
         return outputs, targets
 
@@ -84,7 +84,7 @@ class Runner(object):
         # utils.pprint_dict
         utils.pprint_dict(config_parameters, logger.info)
         logger.info("Running on device {}".format(DEVICE))
-        labels_df = pd.read_csv(config_parameters['label'], sep='\t')
+        labels_df = pd.read_csv(config_parameters['trainlabel'], sep='\t')
         # In case of ave dataset where index is int, we change the
         # absolute name to relname
         if not np.issubdtype(labels_df['filename'].dtype, np.number):
@@ -116,7 +116,7 @@ class Runner(object):
         colname = config_parameters.get('colname', ('filename', 'encoded'))  #
         trainloader = dataset.getdataloader(
             train_df,
-            config_parameters['data'],
+            config_parameters['traindata'],
             transform=transform,
             sampler=train_sampler,  # shuffle is mutually exclusive
             batch_size=config_parameters['batch_size'],
@@ -124,7 +124,7 @@ class Runner(object):
             num_workers=config_parameters['num_workers'])
         cvdataloader = dataset.getdataloader(
             cv_df,
-            config_parameters['data'],
+            config_parameters['traindata'],
             transform=None,
             shuffle=False,
             colname=colname,  # For other datasets with different key names
@@ -146,8 +146,12 @@ class Runner(object):
                 optimizer = adabound.AdaBound(
                     model.parameters(), **config_parameters['optimizer_args'])
             except ImportError:
+                logger.info(
+                    "Adabound package not found, install via pip install adabound. Using Adam instead"
+                )
                 config_parameters['optimizer'] = 'Adam'
-                config_parameters['optimizer_args'] = {}
+                config_parameters['optimizer_args'] = {
+                }  # Default adam is adabount not found
         else:
             optimizer = getattr(
                 torch.optim,
@@ -181,7 +185,7 @@ class Runner(object):
                                                        device=DEVICE)
 
         RunningAverage(output_transform=lambda x: x).attach(
-            train_engine, 'run_loss')
+            train_engine, 'run_loss')  # Showing progressbar during training
         pbar = ProgressBar(persist=False)
         pbar.attach(train_engine, ['run_loss'])
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
@@ -251,7 +255,7 @@ class Runner(object):
         labels_df = pd.read_csv(config_parameters['label'])
 
         labels_df['encoded'], encoder = utils.encode_labels(
-            labels=labels_df['event_label'], encoder=encoder)
+            labels=labels_df['target'], encoder=encoder)
         config_parameters.setdefault('colname', ('filename', 'encoded'))
         dataloader = dataset.getdataloader(
             labels_df,
@@ -273,33 +277,49 @@ class Runner(object):
                     datawriter.writerow([filename, pred[0].item()])
         print("Score file can be found at {}".format(result_file))
 
-    def train_evaluate(self, config, test_data, test_label, **kwargs):
-        """train_evaluate
+    def run(self, config, **kwargs):
+        """run
+
+        Trains and evaluates a given config
 
         :param config: Config for training and evaluation
             :param data: pass --data for trainingdata (HDF5)
             :param label: pass --label for training labels
         :param test_data: Data to use for testing (HDF5)
-        :param test_label:
+        :param test_label: According labels for testing
         :param **kwargs:
         """
+        config_parameters = utils.parse_config_or_kwargs(config, **kwargs)
         experiment_path = self.train(config, **kwargs)
-        scores_file = Path(experiment_path,
-                           'scores_' + Path(test_data).stem + '.txt')
-        self.score(experiment_path,
-                   result_file=scores_file,
-                   label=test_label,
-                   data=test_data)
-        self.evaluate_eer(scores_file)
+        evaluation_logger = utils.getfile_outlogger(
+            Path(experiment_path, 'evaluation.log'))
+        for testdata, testlabel in zip(config_parameters['testdata'],
+                                       config_parameters['testlabel']):
+            evaluation_logger.info(
+                f'Evaluting {testdata} with {testlabel} in {experiment_path}')
+            scores_file = Path(experiment_path,
+                               'scores_' + Path(testdata).stem + '.txt')
+            self.score(experiment_path,
+                       result_file=scores_file,
+                       label=testlabel,
+                       data=testdata)
+            self.evaluate_eer(scores_file, ground_truth_file=testlabel)
 
     def evaluate_eer(self,
                      scores_file,
+                     ground_truth_file,
                      evaluation_res_file: str = None,
                      return_cm=False):
         # Directly run the evaluation
-        df = pd.read_csv(
-            scores_file,
-            names=['filename', 'spooftype', 'binarytype', 'score'])
+        gt_df = pd.read_csv(ground_truth_file,
+                            names=[
+                                'speaker', 'filename', 'physicaltype',
+                                'logicaltype', 'target'
+                            ])
+        pred_df = pd.read_csv(scores_file, names=['filename', 'score'])
+        df = pred_df.merge(gt_df, on='filename')
+        assert len(pred_df) == len(df) == len(gt_df), "Merge was uncessful"
+
         spoof_cm = df[df['target'] == 'spoof']
         bona_cm = df[df['target'] == 'bonafide']
         eer_cm = em.compute_eer(bona_cm, spoof_cm)[0]

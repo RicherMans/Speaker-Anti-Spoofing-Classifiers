@@ -1,4 +1,3 @@
-from itertools import zip_longest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -61,11 +60,8 @@ class LightCNN(nn.Module):
         self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2, (1, 2)])
         net = nn.ModuleList()
         for nl, (h0, h1, filtersize, poolingsize) in enumerate(
-                zip_longest(self._filter, self._filter, self._filtersizes,
-                            self._pooling)):
-            # Stop in zip_longest when last element arrived
-            if not h1:
-                break
+                zip(self._filter, self._filter, self._filtersizes,
+                    self._pooling)):
             if nl == 0:
                 mfmtype = "MFM"
             else:
@@ -77,29 +73,27 @@ class LightCNN(nn.Module):
                 padding=int(filtersize) // 2,
                 stride=1,
             ))
-            # Poolingsize will be None if pooling is finished
-            if poolingsize:
-                net.append(nn.MaxPool2d(kernel_size=poolingsize))
+            net.append(nn.MaxPool2d(kernel_size=poolingsize))
             # Only dropout at last layer before GRU
             if nl == (len(self._filter) - 2):
                 net.append(nn.Dropout(0.3))
         self.network = nn.Sequential(*net)
         with torch.no_grad():
-            feature_output = self.network(torch.randn(1, 1, 300, 64)).shape
+            feature_output = self.network(torch.randn(1, 1, 300, inputdim)).shape
             feature_output = feature_output[-1] * feature_output[1]
 
         self.timepool = nn.AdaptiveAvgPool2d(1)
-        self.outputlayer = nn.Sequential(nn.Linear(feature_output, outputdim),
-                                         nn.Sigmoid())
+        self.outputlayer = nn.Sequential(
+            nn.Conv1d(feature_output, outputdim, kernel_size=1, groups=1))
+
         self.network.apply(init_weights)
         self.outputlayer.apply(init_weights)
 
     def forward(self, x):
         x = x.unsqueeze(1)
-        time_output = self.network(x)
-        x = self.timepool(time_output).flatten(1)
-        clip_output = self.outputlayer(x)
-        return clip_output, time_output
+        x = self.network(x)
+        x = self.timepool(x).flatten(-2)
+        return self.outputlayer(x)
 
 
 def init_weights(m):
