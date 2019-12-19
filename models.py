@@ -74,12 +74,12 @@ class LightCNN(nn.Module):
                 stride=1,
             ))
             net.append(nn.MaxPool2d(kernel_size=poolingsize))
-            # Only dropout at last layer before GRU
             if nl == (len(self._filter) - 2):
                 net.append(nn.Dropout(0.3))
         self.network = nn.Sequential(*net)
         with torch.no_grad():
-            feature_output = self.network(torch.randn(1, 1, 300, inputdim)).shape
+            feature_output = self.network(torch.randn(1, 1, 300,
+                                                      inputdim)).shape
             feature_output = feature_output[-1] * feature_output[1]
 
         self.timepool = nn.AdaptiveAvgPool2d(1)
@@ -94,6 +94,59 @@ class LightCNN(nn.Module):
         x = self.network(x)
         x = self.timepool(x).flatten(-2)
         return self.outputlayer(x)
+
+
+class DisCNN(nn.Module):
+    def __init__(self, inputdim, outputdim, **kwargs):
+        super().__init__()
+        self._filter = [1] + kwargs.get('filter', [16, 128, 512])
+        self._pooling = kwargs.get('pooling', [(1, 4)] * 3)
+        self._filtersizes = kwargs.get('filtersizes', [11, 7, 5])
+        net = nn.ModuleList()
+        for nl, (h0, h1, filtersize, poolingsize) in enumerate(
+                zip(self._filter, self._filter, self._filtersizes,
+                    self._pooling)):
+            if nl == 0:
+                mfmtype = "MFM"
+            else:
+                mfmtype = "MFMGroup"
+            net.append(globals()[mfmtype](
+                in_channels=h0,
+                out_channels=h1,
+                kernel_size=filtersize,
+                padding=int(filtersize) // 2,
+                stride=1,
+            ))
+            net.append(nn.MaxPool2d(kernel_size=poolingsize))
+            if nl == (len(self._filter) - 2):
+                net.append(nn.Dropout(0.3))
+        self.network.append(nn.AdaptiveMaxPool2d((None, 1)))
+        self.network = nn.Sequential(*net)
+        with torch.no_grad():
+            feature_output = self.network(torch.randn(1, 1, 300,
+                                                      inputdim)).shape
+            feature_output = feature_output[-1] * feature_output[1]
+        self.attention = nn.Conv1d(feature_output, outputdim, kernel_size=1)
+        nn.init.zeros_(self.attention.weight)
+        nn.init.zeros_(self.attention.bias)
+        self.outputlayer = nn.Sequential(
+            nn.Conv1d(feature_output,
+                      outputdim,
+                      kernel_size=1,
+                      groups=outputdim))
+
+        self.network.apply(init_weights)
+        self.outputlayer.apply(init_weights)
+
+    def forward(self, x):
+        x = x.unsqueeze(1)
+        x = self.network(x).squeeze(-1)
+        weight = self.attention(x)
+        a_ct = torch.softmax(weight / x.shape[-1], dim=1)
+        shared_space = (x.unsqueeze(-1) *
+                        a_ct.unsqueeze(-2)).flatten(-2).contiguous()
+        h = torch.sum(shared_space, dim=1)
+        return self.outputlayer(h.unsqueeze(-1)).squeeze(-1)
 
 
 def init_weights(m):
