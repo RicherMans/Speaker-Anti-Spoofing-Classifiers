@@ -59,8 +59,8 @@ def main():
     feature_fun = FEATURES[args.feat]
 
     def extract_feature(fname):
-        y = librosa.load(fname, sr=args.sr)[0].astype(np.float32)
-        y = feature_fun(y)
+        y, sr = librosa.load(fname, sr=args.sr)
+        y = feature_fun(y.astype(np.float32), sr)
         y = scaler.fit_transform(y)
         return fname, y
 
