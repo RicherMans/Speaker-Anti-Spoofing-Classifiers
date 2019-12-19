@@ -41,6 +41,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('csvfile', type=str)
     parser.add_argument('-o', '--out', type=str, required=True)
+    parser.add_argument('-sep',
+                        default=',',
+                        help='Separator for input csvfile')
     parser.add_argument('-f',
                         '--feat',
                         type=str,
@@ -52,19 +55,20 @@ def main():
     parser.add_argument('-cvn', default=False, action='store_true')
     args = parser.parse_args()
 
-    df = pd.read_csv(args.csvfile, usecols=[0])  #Just use first column
+    df = pd.read_csv(args.csvfile, sep=args.sep,
+                     usecols=[0])  #Just use first column
 
-    scaler = StandardScaler(with_mean=args.cmn, with_std=args.cvn)
+    CMVN_SCALER = StandardScaler(with_mean=args.cmn, with_std=args.cvn)
 
     feature_fun = FEATURES[args.feat]
 
     def extract_feature(fname):
         y, sr = librosa.load(fname, sr=args.sr)
         y = feature_fun(y.astype(np.float32), sr)
-        y = scaler.fit_transform(y)
+        y = CMVN_SCALER.fit_transform(y)
         return fname, y
 
-    all_files = df[0].unique().values
+    all_files = df[0].unique()
 
     output_path = pathlib.Path(args.out)
     if output_path.is_file():
