@@ -84,7 +84,7 @@ class Runner(object):
         # utils.pprint_dict
         utils.pprint_dict(config_parameters, logger.info)
         logger.info("Running on device {}".format(DEVICE))
-        labels_df = pd.read_csv(config_parameters['trainlabel'], sep='\t')
+        labels_df = pd.read_csv(config_parameters['trainlabel'], sep=' ')
         # In case of ave dataset where index is int, we change the
         # absolute name to relname
         if not np.issubdtype(labels_df['filename'].dtype, np.number):
@@ -252,7 +252,7 @@ class Runner(object):
         encoder = torch.load(glob.glob(
             '{}/run_encoder*'.format(experiment_path))[0],
                              map_location=lambda storage, loc: storage)
-        labels_df = pd.read_csv(config_parameters['label'])
+        labels_df = pd.read_csv(config_parameters['label'], sep=' ')
 
         labels_df['encoded'], encoder = utils.encode_labels(
             labels=labels_df['target'], encoder=encoder)
@@ -311,12 +311,8 @@ class Runner(object):
                      evaluation_res_file: str = None,
                      return_cm=False):
         # Directly run the evaluation
-        gt_df = pd.read_csv(ground_truth_file,
-                            names=[
-                                'speaker', 'filename', 'physicaltype',
-                                'logicaltype', 'target'
-                            ])
-        pred_df = pd.read_csv(scores_file, names=['filename', 'score'])
+        gt_df = pd.read_csv(ground_truth_file, sep=' ')
+        pred_df = pd.read_csv(scores_file, names=['filename', 'score'], sep=' ')
         df = pred_df.merge(gt_df, on='filename')
         assert len(pred_df) == len(df) == len(gt_df), "Merge was uncessful"
 

@@ -17,9 +17,12 @@ if [[ ! -d $wavedir ]]; then
     echo "$wavedir not found"
     exit
 fi
+
 for protocol in train dev eval;
 do 
     labelfile=$(find ${datadir}/CM_protocol -name "*${protocol}*");
-    cat $labelfile | awk -v base=${wavedir} 'BEGIN{print "filename","speaker","latype","bintype"}{print base"/"$1"/"$2, $1,$3,$4}' > ${outputdir}/${protocol}".tsv"
+    cat $labelfile | awk -v base=${wavedir} 'BEGIN{print "filename","speaker","latype","bintype"; 
+    map["human"]="genuine"; map["spoof"]="spoof"}
+    {print base"/"$1"/"$2".wav", $1,$3,map[$4]}' > ${outputdir}/${protocol}".tsv"
     echo "Generated ${outputdir}/${protocol}.tsv"
 done

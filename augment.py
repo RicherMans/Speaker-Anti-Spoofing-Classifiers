@@ -33,6 +33,10 @@ class Roll(nn.Module):
 
 
 class TimeMask(nn.Module):
+    """
+    TimeMask
+    SpecAug-like time masking
+    """
     def __init__(self, n=1, p=50):
         super().__init__()
         self.p = p
@@ -50,6 +54,9 @@ class TimeMask(nn.Module):
 
 
 class FreqMask(nn.Module):
+    """FreqMask
+    SpecAug-like freq masking
+    """
     def __init__(self, n=1, p=12):
         super().__init__()
         self.p = p
