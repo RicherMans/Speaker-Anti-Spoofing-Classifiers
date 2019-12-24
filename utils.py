@@ -78,7 +78,7 @@ def pprint_dict(in_dict, outputfun=sys.stdout.write, formatter='yaml'):
 def getfile_outlogger(outputfile):
     formatter = logging.Formatter(
         "[ %(levelname)s : %(asctime)s ] - %(message)s")
-    logger = logging.getLogger(__name__ + "." + outputfile)
+    logger = logging.getLogger(str(outputfile/__name__)) # Pathlib
     logger.setLevel(logging.INFO)
     stdlog = logging.StreamHandler(sys.stdout)
     stdlog.setFormatter(formatter)
@@ -100,16 +100,16 @@ def encode_labels(labels: pd.Series, encoder=None):
     returns encoded labels (many hot) and the encoder
     """
     assert isinstance(labels, pd.Series), "Labels need to be series"
-    if isinstance(labels[0], six.string_types):
+    if isinstance(labels[0], six.string_types): #Multi-label type
         # In case of using non processed strings, e.g., Vaccum, Speech
-        label_array = labels.str.split(',').values.tolist()
+        label_array = labels.values.tolist()
     elif isinstance(labels[0], np.ndarray):
         # Encoder does not like to see numpy array
         label_array = [lab.tolist() for lab in labels]
     elif isinstance(labels[0], collections.Iterable):
         label_array = labels
     if not encoder:
-        encoder = pre.LabelBinarizer()
+        encoder = pre.LabelEncoder()
         encoder.fit(label_array)
     labels_encoded = encoder.transform(label_array)
-    return labels_encoded.astype(np.float32).tolist(), encoder
+    return labels_encoded.astype(int).tolist(), encoder

@@ -1,14 +1,13 @@
-traindata: data/hdf5/asv15/spec/train.h5
+traindata: features/hdf5/asv15/spec/train.h5
 trainlabel: data/filelists/asv15/train.tsv
-testdata: [data/hdf5/asv15/spec/eval.h5] #Multiple testdata is also allowed
+testdata: [features/hdf5/asv15/spec/eval.h5] #Multiple testdata is also allowed
 testlabel: [data/filelists/asv15/eval.tsv]
 optimizer: Adam
 optimizer_args:
   lr: 0.004
 transforms: [] # no transformations
-dataloader_args:
-  batch_size: 64
-  num_workers: 3
+batch_size: 64
+num_workers: 3
 epochs: 100
 # BCELoss has no args, otherwise FocalLoss can have 'alpha' and 'gamma'
 loss: CrossEntropyLoss

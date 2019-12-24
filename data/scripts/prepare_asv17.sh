@@ -14,7 +14,7 @@ echo "Putting filelists to $outputdir"
 
 for protocol in train dev eval;
 do 
-    wavedir=$(readlink -f ${datadir}/ASVspoof2017_${protocol})
+    wavedir=$(readlink -e ${datadir}/ASVspoof2017_*${protocol})
     if [[ ${protocol} == "eval" ]]; then
         # Evaluation has 2 protocols
         labelfile=$(find -L ${datadir}/protocol -name "*${protocol}*"); # Two files will be found

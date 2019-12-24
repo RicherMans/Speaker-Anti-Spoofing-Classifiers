@@ -6,6 +6,7 @@ import datetime
 import glob
 import uuid
 from pathlib import Path
+import os  # Just for os.environ
 
 import fire
 import numpy as np
@@ -20,7 +21,6 @@ from tqdm import tqdm
 
 import dataset
 import evaluation.eval_metrics as em
-import metrics
 import models
 import utils
 
@@ -85,16 +85,10 @@ class Runner(object):
         utils.pprint_dict(config_parameters, logger.info)
         logger.info("Running on device {}".format(DEVICE))
         labels_df = pd.read_csv(config_parameters['trainlabel'], sep=' ')
-        # In case of ave dataset where index is int, we change the
-        # absolute name to relname
-        if not np.issubdtype(labels_df['filename'].dtype, np.number):
-            # if not labels_df['filename'].isnumeric():
-            labels_df.loc[:, 'filename'] = labels_df['filename'].apply(
-                lambda x: Path(x).name)
         labels_df['encoded'], encoder = utils.encode_labels(
             labels=labels_df['bintype'])
         train_df, cv_df = utils.split_train_cv(
-            labels_df, **config_parameters['data_args'])
+            labels_df)
 
         transform = utils.parse_transforms(config_parameters['transforms'])
         utils.pprint_dict({'Classes': encoder.classes_},
@@ -176,12 +170,17 @@ class Runner(object):
             'Accuracy': Accuracy(),
             'F1': f1_score,
         }
+        # batch contains 3 elements, X,Y and filename. Filename is only used
+        # during evaluation
+        batch_prep = lambda batch: (batch[0].to(DEVICE), batch[1].to(DEVICE))
         train_engine = create_supervised_trainer(model,
                                                  optimizer=optimizer,
                                                  loss_fn=criterion,
+                                                 prepare_batch=batch_prep,
                                                  device=DEVICE)
         inference_engine = create_supervised_evaluator(model,
                                                        metrics=metrics,
+                                                       prepare_batch=batch_prep,
                                                        device=DEVICE)
 
         RunningAverage(output_transform=lambda x: x).attach(
@@ -269,7 +268,7 @@ class Runner(object):
         with torch.no_grad(), open(result_file,
                                    'w') as wp, tqdm(total=len(dataloader),
                                                     unit='data'):
-            datawriter = csv.writer(wp)
+            datawriter = csv.writer(wp, delimiter=' ')
             for batch in dataloader:
                 preds, filenames = self._forward(model, batch)
                 for pred, filename in zip(preds, filenames):
@@ -314,7 +313,9 @@ class Runner(object):
         gt_df = pd.read_csv(ground_truth_file, sep=' ')
         pred_df = pd.read_csv(scores_file, sep=' ')
         df = pred_df.merge(gt_df, on='filename')
-        assert len(pred_df) == len(df) == len(gt_df), "Merge was uncessful, some utterances (filenames) do not match"
+        assert len(pred_df) == len(df) == len(
+            gt_df
+        ), "Merge was uncessful, some utterances (filenames) do not match"
 
         spoof_cm = df[df['target'] == 'spoof']
         bona_cm = df[df['target'] == 'bonafide']

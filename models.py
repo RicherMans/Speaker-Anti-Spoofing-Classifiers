@@ -67,13 +67,12 @@ class MFMGroup(nn.Module):
 class LightCNN(nn.Module):
     def __init__(self, inputdim, outputdim, **kwargs):
         super().__init__()
-        self._filtersizes = kwargs.get('filtersizes', [3, 3, 3, 3, 3, 3, 3])
-        self._filter = [1] + kwargs.get('filter',
-                                        [16, 48, 96, 128, 256, 512, 1024])
-        self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2, (1, 2)])
-        net = nn.ModuleList()
+        self._filtersizes = kwargs.get('filtersizes', [3, 3, 3, 3, 3])
+        self._filter = [1] + kwargs.get('filter', [16, 24, 32, 16, 16])
+        self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2])
+        net = nn.ModuleList([nn.BatchNorm2d(1)])
         for nl, (h0, h1, filtersize, poolingsize) in enumerate(
-                zip(self._filter, self._filter, self._filtersizes,
+                zip(self._filter, self._filter[1:], self._filtersizes,
                     self._pooling)):
             if nl == 0:
                 mfmtype = "MFM"

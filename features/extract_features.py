@@ -18,7 +18,6 @@ FEATURES = {
     lambda y, sr: np.log(
         np.abs(
             librosa.core.stft(y,
-                              sr=sr,
                               **{
                                   'hop_length': 160,
                                   'win_length': 400,
@@ -39,11 +38,11 @@ FEATURES = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('csvfile', type=str)
+    parser.add_argument('tsvfile', type=str)
     parser.add_argument('-o', '--out', type=pathlib.Path, required=True)
     parser.add_argument('-sep',
-                        default=',',
-                        help='Separator for input csvfile')
+                        default=' ',
+                        help='Separator for input tsvfile')
     parser.add_argument('-f',
                         '--feat',
                         type=str,
@@ -55,8 +54,11 @@ def main():
     parser.add_argument('-cvn', default=False, action='store_true')
     args = parser.parse_args()
 
-    df = pd.read_csv(args.csvfile, sep=args.sep,
-                     usecols=[0])  #Just use first column
+    df = pd.read_csv(args.tsvfile,
+                     sep=args.sep,
+                     usecols=[0],
+                     header=0,
+                     names=[0])  #Just use first column
     args.out.parent.mkdir(parents=True, exist_ok=True)
 
     CMVN_SCALER = StandardScaler(with_mean=args.cmn, with_std=args.cvn)
