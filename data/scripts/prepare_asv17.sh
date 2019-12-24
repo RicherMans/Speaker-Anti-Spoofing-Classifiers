@@ -17,12 +17,12 @@ do
     wavedir=$(readlink -f ${datadir}/ASVspoof2017_${protocol})
     if [[ ${protocol} == "eval" ]]; then
         # Evaluation has 2 protocols
-        labelfile=$(find ${datadir}/protocol -name "*${protocol}*"); # Two files will be found
+        labelfile=$(find -L ${datadir}/protocol -name "*${protocol}*"); # Two files will be found
         paste $labelfile | awk -v base=${wavedir} '
         BEGIN{print "filename","speaker","phrase","env_id","play_id","rec_id","bintype"}
         {print base"/"$1, $5,$4,$7,$8,$9,$2 }' > $outputdir/${protocol}".tsv"
     else
-        labelfile=$(find ${datadir}/protocol -name "*${protocol}*");
+        labelfile=$(find -L ${datadir}/protocol -name "*${protocol}*");
         cat $labelfile | awk -v base=${wavedir} '
         BEGIN{print "filename","speaker","phrase","env_id","play_id","rec_id","bintype"}
         {print base"/"$1,$3,$4,$5,$6,$7,$2 }' > $outputdir/${protocol}".tsv"

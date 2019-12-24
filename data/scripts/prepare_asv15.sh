@@ -20,9 +20,9 @@ fi
 
 for protocol in train dev eval;
 do 
-    labelfile=$(find ${datadir}/CM_protocol -name "*${protocol}*");
+    labelfile=$(find -L ${datadir}/CM_protocol -name "*${protocol}*");
     cat $labelfile | awk -v base=${wavedir} 'BEGIN{print "filename","speaker","latype","bintype"; 
-    map["human"]="genuine"; map["spoof"]="spoof"}
-    {print base"/"$1"/"$2".wav", $1,$3,map[$4]}' > ${outputdir}/${protocol}".tsv"
+    map["human"]="genuine"}
+    {print base"/"$1"/"$2".wav", $1,$3,($4 in map)?map[$4]:"spoof"}' > ${outputdir}/${protocol}".tsv"
     echo "Generated ${outputdir}/${protocol}.tsv"
 done

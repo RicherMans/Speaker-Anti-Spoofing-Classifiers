@@ -13,7 +13,7 @@ mkdir -p $outputdir
 echo "Putting filelists to $outputdir"
 
 wavedir=$(readlink -e ${datadir}) # Full path to waves
-for data in $(find ${datadir} -type d -name for-*); do
+for data in $(find -L ${datadir} -type d -name for-*); do
     echo "Processing ${data}"
     subset_name=${data##*/};
     data=$(readlink -f $data)
