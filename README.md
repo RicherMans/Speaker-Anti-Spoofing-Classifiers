@@ -46,3 +46,24 @@ Features are extracted using the [librosa](https://github.com/librosa/librosa) t
 Currently, the (what I think) most popular model is [LightCNN](https://arxiv.org/abs/1511.02683), which is the winner of the ASVspoof2017 challenge [paper](https://pdfs.semanticscholar.org/a2b4/c396dc1064fb90bb5455525733733c761a7f.pdf).
 
 My current implementation can be seen in `models.py`.
+
+## Config
+
+The framework here uses a combination of [google-fire](https://github.com/google/python-fire) and `yaml` parsing to enable a convenient interface for anti-spoofing model training.
+By default one needs to pass a .yaml config into any of the command scripts. However parameters of the `yaml` files can also be overwritten on the fly:
+
+`python3 run.py train config/asv17.yaml --model MYMODEL`, searches for the model `MYMODEL` in `models.py` and runs the experiment using that model.
+
+Other noteable args are:
+
+* `--model_args '{filters:[60,60]}'` sets the filter sizes of a convolutional model to `60, 60`.
+* `--dataloader_args '{batch_size: 32, num_workers:2}'` sets training hyper parameters `batch_size` as well as the number of async workers for dataloading.
+
+
+## Commands
+
+The main script of this repository is `run.py`. Three commands are available:
+
+* `train` e.g., `python3 run.py train config/asv17.yaml` trains a specified model on specified data.
+* `score` e.g., `python3 run.py score EXPERIMENT_PATH --test_label '[data/filelists/asv17/eval.tsv]' --test_data '[data/hdf5/asv17/spec/eval.h5]'` scores a given experiment from a path against testdata/testlabels. Multiple tests are also allowed.
+* `run` e.g., `python3 run.py run config/asv17.yaml` trains and scores an experiment.
