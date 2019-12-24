@@ -92,7 +92,7 @@ class Runner(object):
             labels_df.loc[:, 'filename'] = labels_df['filename'].apply(
                 lambda x: Path(x).name)
         labels_df['encoded'], encoder = utils.encode_labels(
-            labels=labels_df['event_labels'])
+            labels=labels_df['bintype'])
         train_df, cv_df = utils.split_train_cv(
             labels_df, **config_parameters['data_args'])
 
@@ -255,7 +255,7 @@ class Runner(object):
         labels_df = pd.read_csv(config_parameters['label'], sep=' ')
 
         labels_df['encoded'], encoder = utils.encode_labels(
-            labels=labels_df['target'], encoder=encoder)
+            labels=labels_df['bintype'], encoder=encoder)
         config_parameters.setdefault('colname', ('filename', 'encoded'))
         dataloader = dataset.getdataloader(
             labels_df,
@@ -312,9 +312,9 @@ class Runner(object):
                      return_cm=False):
         # Directly run the evaluation
         gt_df = pd.read_csv(ground_truth_file, sep=' ')
-        pred_df = pd.read_csv(scores_file, names=['filename', 'score'], sep=' ')
+        pred_df = pd.read_csv(scores_file, sep=' ')
         df = pred_df.merge(gt_df, on='filename')
-        assert len(pred_df) == len(df) == len(gt_df), "Merge was uncessful"
+        assert len(pred_df) == len(df) == len(gt_df), "Merge was uncessful, some utterances (filenames) do not match"
 
         spoof_cm = df[df['target'] == 'spoof']
         bona_cm = df[df['target'] == 'bonafide']
