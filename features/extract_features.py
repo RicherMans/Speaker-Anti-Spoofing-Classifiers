@@ -57,6 +57,7 @@ def main():
 
     df = pd.read_csv(args.csvfile, sep=args.sep,
                      usecols=[0])  #Just use first column
+    pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)
 
     CMVN_SCALER = StandardScaler(with_mean=args.cmn, with_std=args.cvn)
 
