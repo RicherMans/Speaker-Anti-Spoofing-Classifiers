@@ -1,0 +1,20 @@
+traindata: data/hdf5/btas16/spec/train.h5
+trainlabel: data/filelists/btas16/train.tsv
+testdata: [data/hdf5/btas16/spec/eval.h5] #Multiple testdata is also allowed
+testlabel: [data/filelists/btas16/eval.tsv]
+optimizer: Adam
+optimizer_args:
+  lr: 0.004
+transforms: [] # no transformations
+dataloader_args:
+  batch_size: 64
+  num_workers: 3
+epochs: 100
+# BCELoss has no args, otherwise FocalLoss can have 'alpha' and 'gamma'
+loss: CrossEntropyLoss
+loss_args: {}
+model: LightCNN
+model_args: {}
+sampler: {} # No extra sampling strategy
+outputpath: experiments/btas16/
+

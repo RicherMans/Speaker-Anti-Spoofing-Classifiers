@@ -40,7 +40,7 @@ FEATURES = {
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('csvfile', type=str)
-    parser.add_argument('-o', '--out', type=str, required=True)
+    parser.add_argument('-o', '--out', type=pathlib.Path, required=True)
     parser.add_argument('-sep',
                         default=',',
                         help='Separator for input csvfile')
@@ -57,7 +57,7 @@ def main():
 
     df = pd.read_csv(args.csvfile, sep=args.sep,
                      usecols=[0])  #Just use first column
-    pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
 
     CMVN_SCALER = StandardScaler(with_mean=args.cmn, with_std=args.cvn)
 
@@ -71,10 +71,9 @@ def main():
 
     all_files = df[0].unique()
 
-    output_path = pathlib.Path(args.out)
-    if output_path.is_file():
-        print("File exists {}. Removing ..".format(output_path.resolve()))
-        output_path.unlink()  # Remove if exists
+    if args.out.is_file():
+        print("File exists {}. Removing ..".format(args.out))
+        args.out.unlink()  # Remove if exists
     with h5py.File(args.out, 'w') as hdf5_file, tqdm(total=len(all_files),
                                                      unit='file') as pbar:
         for fname, feat in pr.map(extract_feature,
