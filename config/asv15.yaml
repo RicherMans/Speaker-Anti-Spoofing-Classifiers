@@ -1,7 +1,7 @@
-traindata: data/hdf5/asv17/spec/train.h5
-trainlabel: data/filelists/asv17/train.tsv
-testdata: [data/hdf5/asv17/spec/eval.h5] #Multiple testdata is also allowed
-testlabel: [data/filelists/asv17/eval.tsv]
+traindata: data/hdf5/asv15/spec/train.h5
+trainlabel: data/filelists/asv15/train.tsv
+testdata: [data/hdf5/asv15/spec/eval.h5] #Multiple testdata is also allowed
+testlabel: [data/filelists/asv15/eval.tsv]
 optimizer: Adam
 optimizer_args:
   lr: 0.004
@@ -16,5 +16,5 @@ loss_args: {}
 model: LightCNN
 model_args: {}
 sampler: {} # No extra sampling strategy
-outputpath: experiments/asv17/
+outputpath: experiments/asv15/
 
