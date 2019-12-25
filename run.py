@@ -16,6 +16,7 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import Accuracy, Loss, Precision, Recall, RunningAverage
+from ignite.utils import convert_tensor
 from tabulate import tabulate
 from tqdm import tqdm
 
@@ -87,8 +88,7 @@ class Runner(object):
         labels_df = pd.read_csv(config_parameters['trainlabel'], sep=' ')
         labels_df['encoded'], encoder = utils.encode_labels(
             labels=labels_df['bintype'])
-        train_df, cv_df = utils.split_train_cv(
-            labels_df)
+        train_df, cv_df = utils.split_train_cv(labels_df)
 
         transform = utils.parse_transforms(config_parameters['transforms'])
         utils.pprint_dict({'Classes': encoder.classes_},
@@ -165,23 +165,28 @@ class Runner(object):
         f1_score = (precision * recall * 2 / (precision + recall)).mean()
         metrics = {
             'Loss': Loss(criterion),
-            'Precision': Precision(),
-            'Recall': Recall(),
+            'Precision': precision.mean(),
+            'Recall': recall.mean(),
             'Accuracy': Accuracy(),
             'F1': f1_score,
         }
+
         # batch contains 3 elements, X,Y and filename. Filename is only used
         # during evaluation
-        batch_prep = lambda batch: (batch[0].to(DEVICE), batch[1].to(DEVICE))
+        def _prep_batch(batch, device=DEVICE, non_blocking=False):
+            x, y, _ = batch
+            return (convert_tensor(x, device=device,
+                                   non_blocking=non_blocking),
+                    convert_tensor(y, device=device,
+                                   non_blocking=non_blocking))
+
         train_engine = create_supervised_trainer(model,
                                                  optimizer=optimizer,
                                                  loss_fn=criterion,
-                                                 prepare_batch=batch_prep,
+                                                 prepare_batch=_prep_batch,
                                                  device=DEVICE)
-        inference_engine = create_supervised_evaluator(model,
-                                                       metrics=metrics,
-                                                       prepare_batch=batch_prep,
-                                                       device=DEVICE)
+        inference_engine = create_supervised_evaluator(
+            model, metrics=metrics, prepare_batch=_prep_batch, device=DEVICE)
 
         RunningAverage(output_transform=lambda x: x).attach(
             train_engine, 'run_loss')  # Showing progressbar during training
@@ -251,14 +256,21 @@ class Runner(object):
         encoder = torch.load(glob.glob(
             '{}/run_encoder*'.format(experiment_path))[0],
                              map_location=lambda storage, loc: storage)
-        labels_df = pd.read_csv(config_parameters['label'], sep=' ')
+        testlabel = config_parameters['testlabel']
+        testdata = config_parameters['testdata']
+        # Only a single item to evaluate
+        if isinstance(testlabel, list) and len(testlabel) == 1:
+            testlabel = testlabel[0]
+        if isinstance(testdata, list) and len(testdata) == 1:
+            testdata = testdata[0]
 
+        labels_df = pd.read_csv(testlabel, sep=' ')
         labels_df['encoded'], encoder = utils.encode_labels(
             labels=labels_df['bintype'], encoder=encoder)
         config_parameters.setdefault('colname', ('filename', 'encoded'))
         dataloader = dataset.getdataloader(
-            labels_df,
-            config_parameters['data'],
+            data_frame=labels_df,
+            data_file=testdata,
             batch_size=1,  # do not apply any padding
             colname=config_parameters[
                 'colname']  # For other datasets with different key names
@@ -297,7 +309,7 @@ class Runner(object):
             evaluation_logger.info(
                 f'Evaluting {testdata} with {testlabel} in {experiment_path}')
             scores_file = Path(experiment_path,
-                               'scores_' + Path(testdata).stem + '.txt')
+                               'scores_' + Path(testdata).stem + '.tsv')
             self.score(experiment_path,
                        result_file=scores_file,
                        label=testlabel,

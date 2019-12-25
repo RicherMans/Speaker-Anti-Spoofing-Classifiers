@@ -128,21 +128,13 @@ def sequential_collate(batches):
                       (torch.Tensor, np.ndarray)):  # is tensor, then pad
             data_seq = pad(data_seq)
         elif type(data_seq[0]) is list or type(
-                data_seq[0]) is tuple:  # is label or something, do not pad
+                data_seq[0]) is tuple or isinstance(
+                    data_seq[0],
+                    np.int64):  # is label or something, do not pad
             data_seq = torch.as_tensor(data_seq)
         seqs.append(data_seq)
     return seqs
 
 
 if __name__ == '__main__':
-    labels = pd.read_csv('features/flists/weak.csv', sep='\t')
-    import os
-    labels['filename'] = labels['filename'].apply(os.path.basename)
-    dloader = getdataloader(labels,
-                            'features/hdf5/weak.h5',
-                            num_workers=2,
-                            transform=ToTensor())
-
-    from tqdm import tqdm
-    for d in tqdm(dloader):
-        pass
+    pass
