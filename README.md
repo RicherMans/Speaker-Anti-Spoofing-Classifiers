@@ -57,7 +57,7 @@ By default one needs to pass a .yaml config into any of the command scripts. How
 Other notable arguments are:
 
 * `--model_args '{filters:[60,60]}'` sets the filter sizes of a convolutional model to `60, 60`.
-* `--dataloader_args '{batch_size: 32, num_workers:2}'` sets training hyper parameters `batch_size` as well as the number of async workers for dataloading.
+* `--batch_size 32 --num_workers 2'` sets training hyper parameters `batch_size` as well as the number of async workers for dataloading.
 * `--transforms '[timemask,freqmask]'` applies augmentation on the training data, defined in `augment.py`.
 
 
