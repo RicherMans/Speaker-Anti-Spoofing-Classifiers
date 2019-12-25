@@ -44,8 +44,24 @@ Features are extracted using the [librosa](https://github.com/librosa/librosa) t
 ## Models
 
 Currently, the (what I think) most popular model is [LightCNN](https://arxiv.org/abs/1511.02683), which is the winner of the ASVspoof2017 challenge [paper](https://pdfs.semanticscholar.org/a2b4/c396dc1064fb90bb5455525733733c761a7f.pdf).
-
+Another model called [CGCNN](https://www.isca-speech.org/archive/Interspeech_2019/pdfs/2170.pdf), which modified the `MFM` activation to gated linear unit (GLU) activations has been successfully employed in the ASVspoof2019 challenge.
 My current implementation can be seen in `models.py`.
+
+All experiments conducted in this repository use 90% of the training set as training data and 10% as cross-validation. 
+Development data is not used at all.
+All results are only evaluated on the respective evaluation set.
+
+The baseline results are as follows:
+
+| Dataset | Feature | Model    | EER   |
+|---------|---------|----------|-------|
+| ASV15   | Spec    | LightCNN | 0.28  |
+| ASV15   | Spec    | CGCNN    |       |
+| ASV17   | Spec    | LightCNN | 12.18 |
+| ASV17   | Spec    | CGCNN    | 9.55  |
+| BTAS16  | Spec    | 
+
+
 
 ## Config
 

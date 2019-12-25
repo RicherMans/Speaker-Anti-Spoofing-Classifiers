@@ -64,6 +64,38 @@ class MFMGroup(nn.Module):
         return self.group(x)
 
 
+class MovingAvgNorm(nn.Module):
+    """
+    Calculates multiple moving average estiamtes given a kernel_size
+    Similar to kaldi's apply-cmvn-sliding 
+    """
+    def __init__(self, kernel_size=100, with_mean=True, with_std=True):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.with_mean = with_mean
+        self.with_std = with_std
+        self.eps = 1e-12
+
+    def forward(self, x):
+        assert x.ndim == 3, "Input needs to be tensor of shape B x T x D"
+        n_batch, timedim, featdim = x.shape
+        # Too small utterance, just normalize per time-step
+        if timedim < self.kernel_size:
+            return (x - x.mean(1, keepdim=True)) / (x.std(1, keepdim=True) +
+                                                    self.eps)
+        else:
+            sliding_window = F.pad(
+                x.transpose(1, 2),
+                (self.kernel_size // 2, self.kernel_size // 2 - 1),
+                mode='reflect').unfold(-1, self.kernel_size,
+                                       1).permute(0, 2, 1, 3).contiguous()
+        m = sliding_window.mean(-1) if self.with_mean else torch.zeros_like(
+            x)  # Mean estimate for each window
+        v = sliding_window.std(-1) if self.with_std else torch.ones_like(
+            x)  #Std estiamte for each window
+        return (x - m) / (v + self.eps)
+
+
 class LightCNN(nn.Module):
     def __init__(self, inputdim, outputdim, **kwargs):
         super().__init__()
@@ -71,7 +103,9 @@ class LightCNN(nn.Module):
         self._filter = [1] + kwargs.get('filter', [16, 24, 32, 16, 16])
         self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2])
         self._linear_dim = kwargs.get('lineardim', 128)
-        self.norm = nn.InstanceNorm1d(inputdim)  # First normalize entire input
+        self._cmn = kwargs.get(
+            'cmn', True)  # Use or not use rollwing window standardization
+        self.norm = MovingAvgNorm(150) if self._cmn else nn.Sequential()
         net = nn.ModuleList()
         for nl, (h0, h1, filtersize, poolingsize) in enumerate(
                 zip(self._filter, self._filter[1:], self._filtersizes,
@@ -97,8 +131,8 @@ class LightCNN(nn.Module):
 
         self.timepool = nn.AdaptiveAvgPool2d((1, None))
         self.outputlayer = nn.Sequential(
-            nn.Conv1d(feature_output, self._linear_dim, kernel_size=1),
-            nn.Dropout(0.3),
+            nn.Conv1d(feature_output, self._linear_dim * 2, kernel_size=1),
+            nn.GLU(1), nn.Dropout(0.5),
             nn.Conv1d(self._linear_dim, outputdim, kernel_size=1, groups=1))
 
         self.network.apply(init_weights)
@@ -114,7 +148,7 @@ class LightCNN(nn.Module):
         x = self.timepool(x).permute(0, 2, 1,
                                      3).contiguous().flatten(-2).permute(
                                          0, 2, 1).contiguous()
-        return self.outputlayer(x).squeeze(-1)# dim[-1] is one dimensional
+        return self.outputlayer(x).squeeze(-1)  # dim[-1] is one dimensional
 
 
 def init_weights(m):
