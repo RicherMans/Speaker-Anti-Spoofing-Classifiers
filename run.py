@@ -48,13 +48,6 @@ class Runner(object):
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-    @staticmethod
-    def _forward(model, batch):
-        inputs, targets, filenames = batch
-        inputs, targets = inputs.float().to(DEVICE), targets.long().to(DEVICE)
-        outputs = model(inputs)
-        return outputs, targets
-
     def train(self, config, **kwargs):
         """Trains a given model specified in the config file or passed as the --model parameter.
         All options in the config file can be overwritten as needed by passing --PARAM
@@ -271,21 +264,27 @@ class Runner(object):
         dataloader = dataset.getdataloader(
             data_frame=labels_df,
             data_file=testdata,
+            num_workers=4,
             batch_size=1,  # do not apply any padding
             colname=config_parameters[
                 'colname']  # For other datasets with different key names
         )
         model = model.to(DEVICE).eval()
+        genuine_label_idx = encoder.transform(['genuine'])[0]
 
         with torch.no_grad(), open(result_file,
                                    'w') as wp, tqdm(total=len(dataloader),
-                                                    unit='data'):
+                                                    unit='utts') as pbar:
             datawriter = csv.writer(wp, delimiter=' ')
+            datawriter.writerow(['filename', 'score'])
             for batch in dataloader:
-                preds, filenames = self._forward(model, batch)
+                inputs, _, filenames = batch
+                inputs = inputs.float().to(DEVICE)
+                preds = model(inputs)
                 for pred, filename in zip(preds, filenames):
                     # Single batchsize
                     datawriter.writerow([filename, pred[0].item()])
+                pbar.update()
         print("Score file can be found at {}".format(result_file))
 
     def run(self, config, **kwargs):
@@ -308,13 +307,19 @@ class Runner(object):
                                        config_parameters['testlabel']):
             evaluation_logger.info(
                 f'Evaluting {testdata} with {testlabel} in {experiment_path}')
+            # Scores for later evaluation
             scores_file = Path(experiment_path,
                                'scores_' + Path(testdata).stem + '.tsv')
+            evaluation_result_file = Path(
+                experiment_path) / 'evaluation_{}.txt'.format(
+                    Path(testdata).stem)
             self.score(experiment_path,
                        result_file=scores_file,
                        label=testlabel,
                        data=testdata)
-            self.evaluate_eer(scores_file, ground_truth_file=testlabel)
+            self.evaluate_eer(scores_file,
+                              ground_truth_file=testlabel,
+                              evaluation_res_file=evaluation_result_file)
 
     def evaluate_eer(self,
                      scores_file,
@@ -329,20 +334,20 @@ class Runner(object):
             gt_df
         ), "Merge was uncessful, some utterances (filenames) do not match"
 
-        spoof_cm = df[df['target'] == 'spoof']
-        bona_cm = df[df['target'] == 'bonafide']
+        spoof_cm = df[df['bintype'] == 'spoof']['score']
+        bona_cm = df[df['bintype'] != 'spoof'][
+            'score']  # In any case its not "genuine"
         eer_cm = em.compute_eer(bona_cm, spoof_cm)[0]
         result_string = "EER = {:8.5f} % (Equal error rate for Spoofing detection)".format(
             eer_cm * 100)
+        print(result_string.format(eer_cm * 100))
         if evaluation_res_file:  #Save to file
             with open(evaluation_res_file, 'w') as fp:
                 print(
                     "EER = {:8.5f} % (Equal error rate for Spoofing detection)"
                     .format(eer_cm * 100),
                     file=fp)
-        print(
-            f"Evaluation results are at {evaluation_res_file}\n Prediction scores are at {scores_file}"
-        )
+            print(f"Evaluation results are at {evaluation_res_file}")
         # For evaluate_tDCF in order to avoid too many prints
         if return_cm:
             return spoof_cm, bona_cm, eer_cm

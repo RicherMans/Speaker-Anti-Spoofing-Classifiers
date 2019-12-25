@@ -105,7 +105,6 @@ class LightCNN(nn.Module):
         x = x.unsqueeze(1)
         x = self.network(x)
         x = self.timepool(x).flatten(-2)
-        print(x.shape)
         return self.outputlayer(x).squeeze(-1)
 
 

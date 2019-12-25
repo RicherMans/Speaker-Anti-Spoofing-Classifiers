@@ -84,7 +84,7 @@ def main():
                                   maxsize=int(2 * args.c)):
             # Scale feature directly
             hdf5_file[fname] = feat
-            pbar.set_postfix(name=fname, shape=feat.shape)
+            pbar.set_postfix(name=pathlib.Path(fname).stem, shape=feat.shape)
             pbar.update()
 
 

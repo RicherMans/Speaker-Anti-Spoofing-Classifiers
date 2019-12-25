@@ -15,7 +15,7 @@ echo "Putting filelists to $outputdir"
 function filter_length() {
     # In the dataset there are at least 2 samples being empty
     length=$(soxi -D $1)
-    echo $length | awk '$1>0{print}'
+    echo $length $1 | awk '$1>0{print $2}'
 }
 export -f filter_length
 
@@ -25,7 +25,6 @@ for data in $(find -L ${datadir} -type d -name for-*); do
     subset_name=${data##*/};
     data=$(readlink -f $data)
     # Train
-
     find ${data}/training/fake/ -name *.wav | parallel --bar filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_train.tsv"
     find ${data}/training/real/ -name *.wav | parallel --bar filter_length | awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_train.tsv"
     # DEV
