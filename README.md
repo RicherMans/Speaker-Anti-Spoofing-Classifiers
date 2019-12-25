@@ -53,13 +53,16 @@ All results are only evaluated on the respective evaluation set.
 
 The baseline results are as follows:
 
-| Dataset | Feature | Model    | EER   |
-|---------|---------|----------|-------|
-| ASV15   | Spec    | LightCNN | 0.28  |
-| ASV15   | Spec    | CGCNN    |       |
-| ASV17   | Spec    | LightCNN | 12.18 |
-| ASV17   | Spec    | CGCNN    | 9.55  |
-| BTAS16  | Spec    | 
+| Dataset  | Feature | Model    | EER   |
+|----------|---------|----------|-------|
+| ASV15    | Spec    | LightCNN | 0.28  |
+| ASV15    | Spec    | CGCNN    |       |
+| ASV17    | Spec    | LightCNN | 12.18 |
+| ASV17    | Spec    | CGCNN    | 9.55  |
+| BTAS16   | Spec    | LightCNN |
+| BTAS16   | Spec    | CGCNN    |
+| FoR-norm | Spec    | CGCNN    | 5.69  |
+| FoR-norm | Spec    | LightCNN | 14.22 |
 
 
 

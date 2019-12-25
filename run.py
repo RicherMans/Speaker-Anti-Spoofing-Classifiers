@@ -198,7 +198,7 @@ class Runner(object):
                 scheduler.step()
 
         early_stop_handler = EarlyStopping(
-            patience=7,
+            patience=5,
             score_function=lambda engine: -engine.state.metrics['Loss'],
             trainer=train_engine)
         inference_engine.add_event_handler(Events.EPOCH_COMPLETED,
@@ -218,7 +218,7 @@ class Runner(object):
                 "Validation Results - Epoch : {:<5}".format(engine.state.epoch)
             ]
             for metric in metrics:
-                output_str_list.append("{} {:<5.2f}".format(
+                output_str_list.append("{} {:<5.3f}".format(
                     metric, results[metric]))
             logger.info(" ".join(output_str_list))
             pbar.n = pbar.last_print_n = 0

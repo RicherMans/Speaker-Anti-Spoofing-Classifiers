@@ -1,6 +1,6 @@
 traindata: features/hdf5/FoR_norm/spec/train.h5
 trainlabel: data/filelists/FoR/for-norm_train.tsv
-testdata: [data/hdf5/FoR_norm/spec/eval.h5] #Multiple testdata is also allowed
+testdata: [features/hdf5/FoR_norm/spec/eval.h5] #Multiple testdata is also allowed
 testlabel: [data/filelists/FoR/for-norm_eval.tsv]
 optimizer: Adam
 optimizer_args:
