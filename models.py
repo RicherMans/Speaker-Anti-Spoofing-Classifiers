@@ -70,7 +70,9 @@ class LightCNN(nn.Module):
         self._filtersizes = kwargs.get('filtersizes', [3, 3, 3, 3, 3])
         self._filter = [1] + kwargs.get('filter', [16, 24, 32, 16, 16])
         self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2])
-        net = nn.ModuleList([nn.BatchNorm2d(1)])
+        self._linear_dim = kwargs.get('lineardim', 128)
+        self.norm = nn.InstanceNorm1d(inputdim)  # First normalize entire input
+        net = nn.ModuleList()
         for nl, (h0, h1, filtersize, poolingsize) in enumerate(
                 zip(self._filter, self._filter[1:], self._filtersizes,
                     self._pooling)):
@@ -85,29 +87,34 @@ class LightCNN(nn.Module):
                 padding=int(filtersize) // 2,
                 stride=1,
             ))
-            net.append(nn.MaxPool2d(kernel_size=poolingsize))
-            if nl == (len(self._filter) - 2):
-                net.append(nn.Dropout(0.3))
+            net.append(nn.MaxPool2d(kernel_size=poolingsize, ceil_mode=True))
         self.network = nn.Sequential(*net)
         with torch.no_grad():
             feature_output = self.network(torch.randn(1, 1, 300,
                                                       inputdim)).shape
-            feature_output = feature_output[-1] * feature_output[1]
+            feature_output = feature_output[1] * feature_output[3]
+            # LeftOverFeatDim * ChannelDim
 
-        self.timepool = nn.AdaptiveAvgPool2d(1)
+        self.timepool = nn.AdaptiveAvgPool2d((1, None))
         self.outputlayer = nn.Sequential(
-            nn.Conv1d(self._filter[-1], outputdim, kernel_size=1, groups=1))
+            nn.Conv1d(feature_output, self._linear_dim, kernel_size=1),
+            nn.Dropout(0.3),
+            nn.Conv1d(self._linear_dim, outputdim, kernel_size=1, groups=1))
 
         self.network.apply(init_weights)
         self.outputlayer.apply(init_weights)
 
     def forward(self, x):
+        x = self.norm(x)
         x = x.unsqueeze(1)
-        x = self.network(x)
-        x = self.timepool(x).flatten(-2)
-        return self.outputlayer(x).squeeze(-1)
-
-
+        x = self.network(x)  # pooled time dimension
+        # Pool time dimension
+        # Reshape to B x 1 x C x D, then pool (CxD) to one dimension and
+        # Reshape to B x (CxD) x 1
+        x = self.timepool(x).permute(0, 2, 1,
+                                     3).contiguous().flatten(-2).permute(
+                                         0, 2, 1).contiguous()
+        return self.outputlayer(x).squeeze(-1)# dim[-1] is one dimensional
 
 
 def init_weights(m):
