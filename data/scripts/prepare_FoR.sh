@@ -17,7 +17,12 @@ function filter_length() {
     length=$(soxi -D $1)
     echo $length $1 | awk '$1>0{print $2}'
 }
+
 export -f filter_length
+
+pipe_command="parallel --bar"
+
+
 
 wavedir=$(readlink -e ${datadir}) # Full path to waves
 for data in $(find -L ${datadir} -type d -name for-*); do
@@ -25,13 +30,13 @@ for data in $(find -L ${datadir} -type d -name for-*); do
     subset_name=${data##*/};
     data=$(readlink -f $data)
     # Train
-    find ${data}/training/fake/ -name *.wav | parallel --bar filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_train.tsv"
-    find ${data}/training/real/ -name *.wav | parallel --bar filter_length | awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_train.tsv"
+    find ${data}/training/fake/ -name *.wav | $pipe_command filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_train.tsv"
+    find ${data}/training/real/ -name *.wav | $pipe_command filter_length | awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_train.tsv"
     # DEV
-    find ${data}/validation/fake/ -name *.wav |parallel --bar filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_dev.tsv"
-    find ${data}/validation/real/ -name *.wav | parallel --bar filter_length|awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_dev.tsv"
+    find ${data}/validation/fake/ -name *.wav |$pipe_command filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_dev.tsv"
+    find ${data}/validation/real/ -name *.wav | $pipe_command filter_length|awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_dev.tsv"
     # Eval
-    find ${data}/testing/fake/ -name *.wav | parallel --bar filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_eval.tsv"
-    find ${data}/testing/real/ -name *.wav | parallel --bar filter_length | awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_eval.tsv"
+    find ${data}/testing/fake/ -name *.wav | $pipe_command filter_length | awk 'BEGIN{print "filename","bintype"}{print $1,"spoof"}' > $outputdir/${subset_name}"_eval.tsv"
+    find ${data}/testing/real/ -name *.wav | $pipe_command filter_length | awk '{print $1,"genuine"}' >> $outputdir/${subset_name}"_eval.tsv"
     echo "Generated labels to $outputdir/${subset_name}*"
 done
