@@ -34,9 +34,10 @@ Evaluation scripts are directly taken from the baseline of the ASVspoof2019 chal
 
 The most broadly used datasets for spoofing detection (currently) are:
 
-* [ASVspoof2019](https://datashare.is.ed.ac.uk/handle/10283/3336) encompassing logical and physical attacks alike
+* [ASVspoof2019](https://datashare.is.ed.ac.uk/handle/10283/3336) encompassing logical and physical attacks alike.
 * [ASVspoof2017](https://datashare.is.ed.ac.uk/handle/10283/3055) encompassing only physical attacks with the focus on `in the wild` devices and scenes.
 * [ASVspoof2015](https://datashare.is.ed.ac.uk/handle/10283/853) encompassing only logical attacks with the focus on synthesize and voice conversion attacks.
+
 
 ## Feature extraction
 
@@ -89,3 +90,21 @@ The main script of this repository is `run.py`. Five commands are available:
 * `score` e.g., `python3 run.py score EXPERIMENT_PATH  OUTPUTFILE.tsv --testlabel data/filelists/asv17/eval.tsv --testdata data/hdf5/asv17/spec/eval.h5` scores a given experiment and produces `OUTPUTFILE.tsv` containing the respective scores. End-to-End scoring is utilized, where the `genuine` class scores are representative of the model belief. Only a single dataset can be scored.
 * `evaluate_eer` uses the library contained in `evaluation/` to calculate an EER. Example usage is: `python3 run.py evaluate_eer experiments/asv17/LightCNN/SOMEEXPERIEMNT/scored.txt data/filelists/asv17/eval.tsv output.txt`. `output.txt` is generated with the results ( which are also printed to console ).
 * `run` e.g., `python3 run.py run config/asv17.yaml` trains, scores and evaluates an experiment. Can also support multiple tests using `--testlabel ['a.tsv','b.tsv]'` or just updating the config file. Is effectively `train, score, evaluate_eer` in one and the most recommended way of running any experiment.
+
+
+## Usage
+
+For a simple e.g., ASVspoof2017 dataset run, please run the following:
+
+
+```bash
+cd data/scripts
+bash download_asv17.sh
+bash prepare_asv17.sh
+cd ../../features/
+python3 extract_feature.py ../data/filelists/asv17/train.tsv -o hdf5/asv17/spec/train.h5 # Extracts spectrogram features
+python3 extract_feature.py ../data/filelists/asv17/eval.tsv -o hdf5/asv17/spec/eval.h5 #Spectrogram features
+cd ../
+python3 run.py run config/asv17.yaml # Runs LightCNN Model. Results will be displayed in the console and a directory experiments/asv17 will be created.
+python3 run.py run config/asv17.yaml --model CGCNN # Runs CGCNN Model
+```
