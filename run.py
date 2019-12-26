@@ -355,6 +355,8 @@ class Runner(object):
     def evaluate_tDCF(self, cm_scores_file: str, asv_scores_file: str,
                       evaluation_res_file: str):
         """evaluate_tDCF
+        
+        !! untested and unused
 
         :param cm_scores_file: Spoofing results 
         :type cm_scores_file: str
