@@ -38,6 +38,9 @@ The most broadly used datasets for spoofing detection (currently) are:
 * [ASVspoof2017](https://datashare.is.ed.ac.uk/handle/10283/3055) encompassing only physical attacks with the focus on `in the wild` devices and scenes.
 * [ASVspoof2015](https://datashare.is.ed.ac.uk/handle/10283/853) encompassing only logical attacks with the focus on synthesize and voice conversion attacks.
 
+For mixed logical and physical attacks, the mixed [AVspoof](https://www.idiap.ch/dataset/avspoof) dataset ( a subpart of it is the BTAS16 dataset) can be also used. The dataset is publicly available, but only for research purposes.
+
+Moreover, rather recent the Fake-or-Real (FoR) dataset was introduced using openly available synthesizers such as Baidu, Google, Amazon to create spoofs for logical access.
 
 ## Feature extraction
 
@@ -71,7 +74,7 @@ The baseline results are as follows:
 ## Config
 
 The framework here uses a combination of [google-fire](https://github.com/google/python-fire) and `yaml` parsing to enable a convenient interface for anti-spoofing model training.
-By default one needs to pass a .yaml config into any of the command scripts. However parameters of the `yaml` files can also be overwritten on the fly:
+By default one needs to pass a `*.yaml` configuration file into any of the command scripts. However parameters of the `yaml` files can also be overwritten on the fly:
 
 `python3 run.py train config/asv17.yaml --model MYMODEL`, searches for the model `MYMODEL` in `models.py` and runs the experiment using that model.
 
