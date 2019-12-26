@@ -16,52 +16,56 @@ class MFM(nn.Module):
 
 
     """
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=3,
-                 padding=1,
-                 stride=1):
+    def __init__(self, dim):
         super().__init__()
-        self.filter = nn.Sequential(
-            nn.Conv2d(in_channels,
-                      2 * out_channels,
-                      kernel_size=kernel_size,
-                      padding=padding,
-                      stride=stride))
-        self.norm = nn.BatchNorm2d(out_channels)
+        self.dim = dim
 
     def forward(self, x):
-        x = self.filter(x)
-        low, up = torch.chunk(x, 2, 1)
-        return self.norm(torch.max(low, up))
+        low, up = torch.chunk(x, 2, self.dim)
+        return torch.max(low, up)
 
 
-class MFMGroup(nn.Module):
+class MovingAvgNormNonBias(nn.Module):
     """
-    A Linear MFM followed by a kernel_size MFM
+    Calculates multiple moving average estiamtes given a kernel_size
+    Similar to kaldi's apply-cmvn-sliding 
     """
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=3,
-                 padding=1,
-                 stride=1):
+    def __init__(self, kernel_size=100, with_mean=True, with_std=True):
         super().__init__()
-        self.group = nn.Sequential(
-            MFM(in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=1,
-                padding=0,
-                stride=1),
-            MFM(in_channels=out_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                padding=padding,
-                stride=stride))
+        self.kernel_size = kernel_size
+        self.with_mean = with_mean
+        self.with_std = with_std
+        self.eps = 1e-12
 
     def forward(self, x):
-        return self.group(x)
+        assert x.ndim == 3, "Input needs to be tensor of shape B x T x D"
+        n_batch, timedim, featdim = x.shape
+        with torch.no_grad():
+            # Too small utterance, just normalize per time-step
+            if timedim < self.kernel_size:
+                return (x - x.mean(1, keepdim=True)) / (
+                    x.std(1, keepdim=True) + self.eps)
+            else:
+                sliding_window = F.pad(
+                    x.transpose(1, 2),
+                    (self.kernel_size // 2, self.kernel_size // 2 - 1),
+                    mode='constant').unfold(-1, self.kernel_size,
+                                            1).permute(0, 2, 1,
+                                                       3).contiguous()
+            non_affected_dims = timedim - self.kernel_size
+            denom = list(range(self.kernel_size // 2, self.kernel_size)
+                         ) + [self.kernel_size] * non_affected_dims + list(
+                             range(self.kernel_size - 1,
+                                   (self.kernel_size // 2) - 1, -1))
+            denom = torch.tensor(denom).view(1, -1, 1)
+            m = sliding_window.sum(
+                -1) / denom if self.with_mean else torch.zeros_like(x)
+            v = torch.sqrt(
+                torch.sum(torch.abs((sliding_window - m.unsqueeze(-1)))**2,
+                          dim=-1) /
+                (self.kernel_size -
+                 1)) if self.with_std else torch.ones_like(x)
+            return (x - m) / (v + self.eps)
 
 
 class MovingAvgNorm(nn.Module):
@@ -79,21 +83,23 @@ class MovingAvgNorm(nn.Module):
     def forward(self, x):
         assert x.ndim == 3, "Input needs to be tensor of shape B x T x D"
         n_batch, timedim, featdim = x.shape
-        # Too small utterance, just normalize per time-step
-        if timedim < self.kernel_size:
-            return (x - x.mean(1, keepdim=True)) / (x.std(1, keepdim=True) +
-                                                    self.eps)
-        else:
-            sliding_window = F.pad(
-                x.transpose(1, 2),
-                (self.kernel_size // 2, self.kernel_size // 2 - 1),
-                mode='reflect').unfold(-1, self.kernel_size,
-                                       1).permute(0, 2, 1, 3).contiguous()
-        m = sliding_window.mean(-1) if self.with_mean else torch.zeros_like(
-            x)  # Mean estimate for each window
-        v = sliding_window.std(-1) if self.with_std else torch.ones_like(
-            x)  #Std estiamte for each window
-        return (x - m) / (v + self.eps)
+        with torch.no_grad():
+            # Too small utterance, just normalize per time-step
+            if timedim < self.kernel_size:
+                return (x - x.mean(1, keepdim=True)) / (
+                    x.std(1, keepdim=True) + self.eps)
+            else:
+                sliding_window = F.pad(
+                    x.transpose(1, 2),
+                    (self.kernel_size // 2, self.kernel_size // 2 - 1),
+                    mode='reflect').unfold(-1, self.kernel_size,
+                                           1).permute(0, 2, 1, 3).contiguous()
+            m = sliding_window.mean(
+                -1) if self.with_mean else torch.zeros_like(
+                    x)  # Mean estimate for each window
+            v = sliding_window.std(-1) if self.with_std else torch.ones_like(
+                x)  #Std estiamte for each window
+            return (x - m) / (v + self.eps)
 
 
 class LightCNN(nn.Module):
@@ -111,16 +117,35 @@ class LightCNN(nn.Module):
                 zip(self._filter, self._filter[1:], self._filtersizes,
                     self._pooling)):
             if nl == 0:
-                mfmtype = "MFM"
+                net.append(
+                    nn.Sequential(
+                        nn.GroupNorm(1, h0),
+                        nn.Conv2d(h0,
+                                  h1 * 2,
+                                  kernel_size=filtersize,
+                                  padding=filtersize // 2,
+                                  stride=1),
+                        MFM(1),
+                    ))
+
             else:
-                mfmtype = "MFMGroup"
-            net.append(globals()[mfmtype](
-                in_channels=h0,
-                out_channels=h1,
-                kernel_size=filtersize,
-                padding=int(filtersize) // 2,
-                stride=1,
-            ))
+                net.append(
+                    nn.Sequential(
+                        nn.GroupNorm(1, h0),
+                        nn.Conv2d(h0,
+                                  h1 * 2,
+                                  kernel_size=1,
+                                  padding=0,
+                                  stride=1),
+                        MFM(1),
+                        nn.GroupNorm(1, h1),
+                        nn.Conv2d(h1,
+                                  h1 * 2,
+                                  kernel_size=filtersize,
+                                  padding=filtersize // 2,
+                                  stride=1),
+                        MFM(1),
+                    ))
             net.append(nn.MaxPool2d(kernel_size=poolingsize, ceil_mode=True))
         self.network = nn.Sequential(*net)
         with torch.no_grad():
@@ -170,7 +195,7 @@ class CGCNN(nn.Module):
                     nn.Sequential(
                         nn.GroupNorm(1, h0),
                         nn.Conv2d(h0,
-                                  h1*2,
+                                  h1 * 2,
                                   kernel_size=filtersize,
                                   padding=filtersize // 2,
                                   stride=1),
@@ -181,16 +206,16 @@ class CGCNN(nn.Module):
                     nn.Sequential(
                         nn.GroupNorm(1, h0),
                         nn.Conv2d(h0,
-                                  h1*2,
+                                  h1 * 2,
                                   kernel_size=1,
                                   padding=0,
                                   stride=1),
                         nn.GLU(1),
                         nn.GroupNorm(1, h1),
                         nn.Conv2d(h1,
-                                  h1*2,
+                                  h1 * 2,
                                   kernel_size=filtersize,
-                                  padding=filtersize//2,
+                                  padding=filtersize // 2,
                                   stride=1),
                         nn.GLU(1),
                     ))
