@@ -2,7 +2,7 @@
 
 This repository provides a basic speaker anti-spoofing system using neural networks in pytorch.
 
-Requirements are:
+Python requirements are:
 
 ```
 pandas==0.25.3
@@ -24,6 +24,7 @@ PyYAML==5.2
 scikit_learn==0.22
 ```
 
+Moreover, to download the data, you will need `wget`.
 
 
 Evaluation scripts are directly taken from the baseline of the ASVspoof2019 challenge, seen [here](https://www.asvspoof.org/asvspoof2019/tDCF_python_v1.zip)
