@@ -13,10 +13,11 @@ I recommend to start with the ASVspoof2017 dataset, since it is rather small and
 
 ## Datasets
 
-| Name             | \# Utterances | Size (extracted) |
-|------------------|---------------|------------------|
-| FoR-norm         | 69303         | 6.6 Gb           |
-| ASVspoof2015     | 263151        | 29 Gb            |
-| ASVspoof2017     | 18032         | 1.8 Gb           |
-| ~~BTAS16~~       | 137624        | 19.5 Gb          |
-| ~~ASVspoof2019~~ |               |                  |
+| Name            | \# Utterances | Size (extracted) |
+|-----------------|---------------|------------------|
+| FoR-norm        | 69303         | 6.6 Gb           |
+| ASVspoof2015    | 263151        | 29 Gb            |
+| ASVspoof2017    | 18032         | 1.8 Gb           |
+| ~~BTAS16~~      | 137624        | 19.5 Gb          |
+| ASVspoof2019-LA | 122302        | 7.5 Gb           |
+| ASVspoof2019-PA | 241059        | 17.2 Gb          |
