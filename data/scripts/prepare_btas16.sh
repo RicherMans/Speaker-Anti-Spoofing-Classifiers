@@ -29,6 +29,6 @@ FILENAME==ARGV[2]{val=map[$1]; DELETE_VALUE[val]}
 FILENAME==ARGV[3]{val=map[$1]; DELETE_VALUE[val];} 
 FILENAME==ARGV[4]{if(!($2 in DELETE_VALUE)){print}} 
 FILENAME==ARGV[5]{if(!($2 in DELETE_VALUE)){print}}' ${datadir}/btas2016-testset-match-names.txt ${datadir}/real-dev-anchors4test.txt ${datadir}/attack-dev-anchors4test.txt ${datadir}/test-real-list-derandomized.txt ${datadir}/test-attack-list-derandomized.txt | awk -v base=${wavedir} 'BEGIN{map["genuine"]="genuine"; print "filename","speaker","patype","bintype"}
-{print base"/"$2, $1,$3 ($3 in map)?map[$3]:"spoof"}' > $outputdir/eval.tsv
+{print base"/"$2, $1, $3, ($3 in map)?map[$3]:"spoof"}' > $outputdir/eval.tsv
 
 echo "Generated $outputdir/eval.tsv"
