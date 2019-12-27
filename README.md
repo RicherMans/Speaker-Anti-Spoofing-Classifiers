@@ -10,7 +10,6 @@ tqdm==4.28.1
 torch==1.3.1
 matplotlib==3.1.1
 numpy==1.17.4
-tabulate==0.8.6
 fire==0.2.1
 pytorch_ignite==0.2.1
 h5py==2.10.0

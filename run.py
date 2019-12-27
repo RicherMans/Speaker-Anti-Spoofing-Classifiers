@@ -17,7 +17,6 @@ from ignite.engine import Engine, Events, create_supervised_evaluator, create_su
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import Accuracy, Loss, Precision, Recall, RunningAverage
 from ignite.utils import convert_tensor
-from tabulate import tabulate
 from tqdm import tqdm
 
 import dataset
