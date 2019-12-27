@@ -32,10 +32,10 @@ class MovingAvgNorm(nn.Module):
     """
     def __init__(self, kernel_size=100, with_mean=True, with_std=True):
         super().__init__()
-        self.kernel_size = kernel_size
-        self.with_mean = with_mean
-        self.with_std = with_std
-        self.eps = 1e-12
+        self.register_buffer('kernel_size', torch.tensor(kernel_size))
+        self.register_buffer('with_mean', torch.tensor(with_mean))
+        self.register_buffer('with_std', torch.tensor(with_std))
+        self.register_buffer('eps', torch.tensor(1e-12))
 
     def forward(self, x):
         assert x.ndim == 3, "Input needs to be tensor of shape B x T x D"
@@ -70,7 +70,7 @@ class LightCNN(nn.Module):
         self._linear_dim = kwargs.get('lineardim', 128)
         self._cmn = kwargs.get(
             'cmn', True)  # Use or not use rollwing window standardization
-        self.norm = MovingAvgNorm(100) if self._cmn else nn.Sequential()
+        self.norm = MovingAvgNorm(80) if self._cmn else nn.Sequential()
         net = nn.ModuleList()
         for nl, (h0, h1, filtersize, poolingsize) in enumerate(
                 zip(self._filter, self._filter[1:], self._filtersizes,
@@ -78,7 +78,7 @@ class LightCNN(nn.Module):
             if nl == 0:
                 net.append(
                     nn.Sequential(
-                        nn.GroupNorm(1, h0),
+                        nn.BatchNorm2d(h0),
                         nn.Conv2d(h0,
                                   h1 * 2,
                                   kernel_size=filtersize,
@@ -90,14 +90,14 @@ class LightCNN(nn.Module):
             else:
                 net.append(
                     nn.Sequential(
-                        nn.GroupNorm(1, h0),
+                        nn.BatchNorm2d(h0),
                         nn.Conv2d(h0,
                                   h1 * 2,
                                   kernel_size=1,
                                   padding=0,
                                   stride=1),
                         MFM(1),
-                        nn.GroupNorm(1, h1),
+                        nn.BatchNorm2d(h1),
                         nn.Conv2d(h1,
                                   h1 * 2,
                                   kernel_size=filtersize,
@@ -110,8 +110,8 @@ class LightCNN(nn.Module):
         with torch.no_grad():
             feature_output = self.network(torch.randn(1, 1, 300,
                                                       inputdim)).shape
-            feature_output = feature_output[1] * feature_output[3]
             # LeftOverFeatDim * ChannelDim
+            feature_output = feature_output[1] * feature_output[3]
 
         self.timepool = nn.AdaptiveAvgPool2d((1, None))
         self.outputlayer = nn.Sequential(

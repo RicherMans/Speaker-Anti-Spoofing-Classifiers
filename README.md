@@ -1,6 +1,6 @@
 # Speaker-Anti-Spoofing-Classifiers
 
-This repository provides a basic speaker anti-spoofing system using neural networks in pytorch.
+This repository provides a basic speaker anti-spoofing system using neural networks in pytorch 1.0+ and python 3.6+.
 
 Python requirements are:
 
