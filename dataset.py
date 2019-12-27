@@ -18,7 +18,7 @@ class HDF5Dataset(tdata.Dataset):
                  labels: pd.DataFrame,
                  transform=None,
                  colname=('filename', 'encoded')):
-        super(HDF5Dataset, self).__init__()
+        super().__init__()
         self._h5file = h5file
         self.dataset = None
         self._labels = labels
