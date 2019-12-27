@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-links=("http://www.eecs.yorku.ca/~bil/Datasets/for-2sec.tar.gz" "http://www.eecs.yorku.ca/~bil/Datasets/for-norm.tar.gz")
+links=("http://www.eecs.yorku.ca/~bil/Datasets/for-norm.tar.gz" "https://www.eecs.yorku.ca/~bil/Datasets/for-orig.tar.gz")
 
 basedir=${1:-../FoR}
 echo "Data will be put to ${basedir}" && mkdir -p $basedir
