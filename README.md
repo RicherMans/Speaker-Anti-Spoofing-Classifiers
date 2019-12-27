@@ -100,6 +100,8 @@ For a simple e.g., ASVspoof2017 dataset run, please run the following:
 
 
 ```bash
+git clone https://github.com/RicherMans/Speaker-Anti-Spoofing-Classifiers
+cd Speaker-Anti-Spoofing-Classifiers
 pip3 install -r requirements.txt
 cd data/scripts
 bash download_asv17.sh
