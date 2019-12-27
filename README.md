@@ -100,6 +100,7 @@ For a simple e.g., ASVspoof2017 dataset run, please run the following:
 
 
 ```bash
+pip3 install -r requirements.txt
 cd data/scripts
 bash download_asv17.sh
 bash prepare_asv17.sh
