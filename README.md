@@ -10,7 +10,6 @@ tqdm==4.28.1
 torch==1.3.1
 matplotlib==3.1.1
 numpy==1.17.4
-tabulate==0.8.6
 fire==0.2.1
 pytorch_ignite==0.2.1
 h5py==2.10.0
@@ -101,6 +100,9 @@ For a simple e.g., ASVspoof2017 dataset run, please run the following:
 
 
 ```bash
+git clone https://github.com/RicherMans/Speaker-Anti-Spoofing-Classifiers
+cd Speaker-Anti-Spoofing-Classifiers
+pip3 install -r requirements.txt
 cd data/scripts
 bash download_asv17.sh
 bash prepare_asv17.sh
