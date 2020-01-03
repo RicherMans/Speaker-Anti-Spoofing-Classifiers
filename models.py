@@ -145,7 +145,7 @@ class CGCNN(nn.Module):
         self._filter = [1] + kwargs.get('filter', [16, 24, 32, 16, 16])
         self._pooling = kwargs.get('pooling', [2, 2, 2, 2, 2])
         self._linear_dim = kwargs.get('lineardim', 128)
-        self._cmn = kwargs.get(
+        self._cmvn = kwargs.get(
             'cmvn', True)  # Use or not use rollwing window standardization
         self.norm = MovingAvgNorm(100) if self._cmvn else nn.Sequential()
         net = nn.ModuleList()

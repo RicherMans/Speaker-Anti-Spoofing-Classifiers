@@ -86,10 +86,7 @@ def getdataloader(data_frame,
                   data_file,
                   transform=None,
                   colname=None,
-                  sampler=None,
-                  batch_size=16,
-                  shuffle=False,
-                  num_workers=2):
+                  **dataloader_kwargs):
 
     dset = HDF5Dataset(data_file,
                        data_frame,
@@ -97,11 +94,8 @@ def getdataloader(data_frame,
                        transform=transform)
 
     return tdata.DataLoader(dset,
-                            batch_size=batch_size,
-                            shuffle=shuffle,
-                            sampler=sampler,
-                            num_workers=num_workers,
-                            collate_fn=sequential_collate)
+                            collate_fn=sequential_collate,
+                            **dataloader_kwargs)
 
 
 def pad(tensorlist, batch_first=True, padding_value=0., min_length=501):

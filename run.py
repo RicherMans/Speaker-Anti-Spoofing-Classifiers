@@ -93,21 +93,21 @@ class Runner(object):
             train_sampler = dataset.MinimumOccupancySampler(np.stack(
                 train_df['encoded'].values),
                                                             sampling_factor=1)
+            sampling_kwargs = {"sampler": train_sampler, "shuffle": False}
         else:
-            train_sampler = None
+            sampling_kwargs = {"shuffle": True}
 
-        logger.info("Using Sampler {}".format(
-            train_sampler.__class__.__name__))
+        logger.info("Using Sampler {}".format(sampling_kwargs))
 
         colname = config_parameters.get('colname', ('filename', 'encoded'))  #
         trainloader = dataset.getdataloader(
             train_df,
             config_parameters['traindata'],
             transform=transform,
-            sampler=train_sampler,  # shuffle is mutually exclusive
             batch_size=config_parameters['batch_size'],
             colname=colname,  # For other datasets with different key names
-            num_workers=config_parameters['num_workers'])
+            num_workers=config_parameters['num_workers'],
+            **sampling_kwargs)
         cvdataloader = dataset.getdataloader(
             cv_df,
             config_parameters['traindata'],
