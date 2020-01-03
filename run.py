@@ -90,9 +90,9 @@ class Runner(object):
         if 'sampler' in config_parameters and config_parameters[
                 'sampler'] == 'MinimumOccupancySampler':
             # Asserts that each "batch" contains at least one instance
-            train_sampler = dataset.MinimumOccupancySampler(np.stack(
-                train_df['encoded'].values),
-                                                            sampling_factor=1)
+            train_sampler = dataset.MinimumOccupancySampler(
+                np.stack(train_df['encoded'].values))
+
             sampling_kwargs = {"sampler": train_sampler, "shuffle": False}
         else:
             sampling_kwargs = {"shuffle": True}

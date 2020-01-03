@@ -48,11 +48,18 @@ class HDF5Dataset(tdata.Dataset):
 class MinimumOccupancySampler(tdata.Sampler):
     """
         docstring for MinimumOccupancySampler
-        samples at least one instance from each class sequentially
-    """
-    def __init__(self, labels, sampling_factor=1, random_state=None):
+         samples at least one instance from each class sequentially
+ 
+     """
+    def __init__(self, labels, sampling_mode='same', random_state=None):
+        """__init__
+ 
+         :param labels: numpy array ( or dataframe ) of shape n_samples, n_labels
+         :param sampling_mode: same or all. In mode 'same' we will only randomly sample n_samples, in mode all we oversample to the "most common" seen clip.
+         :param random_state: RandomState
+         """
         self.labels = labels
-        n_samples, n_labels = labels.shape
+        data_samples, n_labels = labels.shape
         self.label_to_idx_list = []
         self.random_state = np.random.RandomState(seed=random_state)
         for lb_idx in range(n_labels):
@@ -61,21 +68,25 @@ class MinimumOccupancySampler(tdata.Sampler):
             self.label_to_idx_list.append(label_indexes)
 
         data_source = []
-        for _ in range(sampling_factor):
-            self.random_state.shuffle(self.label_to_idx_list)
-            for indexes in itertools.zip_longest(*self.label_to_idx_list):
-                indexes = np.array(indexes)
-                to_pad_indexes = np.where(indexes == None)[0]
-                for idx in to_pad_indexes:
-                    indexes[idx] = random.choice(self.label_to_idx_list[idx])
-                data_source.append(indexes)
+        self.random_state.shuffle(self.label_to_idx_list)
+        for sample_idx, indexes in enumerate(
+                itertools.zip_longest(*self.label_to_idx_list)):
+            indexes = np.array(indexes)
+            to_pad_indexes = np.where(indexes == None)[0]
+            for idx in to_pad_indexes:
+                indexes[idx] = random.choice(self.label_to_idx_list[idx])
+            data_source.append(indexes)
         self.data_source = np.array(data_source)
-        self.data_length = np.prod(self.data_source.shape)
+        if sampling_mode == 'same':
+            self.data_length = data_samples
+        elif sampling_mode == 'over':  # Sample all items
+            self.data_length = np.prod(self.data_source.shape)
 
     def __iter__(self):
         n_samples = len(self.data_source)
         random_indices = self.random_state.permutation(n_samples)
-        data = np.concatenate(self.data_source[random_indices])
+        data = np.concatenate(
+            self.data_source[random_indices])[:self.data_length]
         return iter(data)
 
     def __len__(self):
