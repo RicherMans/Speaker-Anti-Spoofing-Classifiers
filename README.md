@@ -59,14 +59,14 @@ The baseline results are as follows:
 
 | Dataset  | Feature | Model    | EER   |
 |----------|---------|----------|-------|
-| ASV15    | Spec    | LightCNN | 2.24|
-| ASV15    | Spec    | CGCNN    | 0.36  |
+| ASV15    | Spec    | LightCNN | 0.68  |
+| ASV15    | Spec    | CGCNN    | 0.33  |
 | ASV17    | Spec    | LightCNN | 12.18 |
-| ASV17    | Spec    | CGCNN    | 11.16  |
-| BTAS16   | Spec    | LightCNN | 2.17  |
-| BTAS16   | Spec    | CGCNN    | 3.11  |
-| FoR-norm | Spec    | LightCNN | 15.49 |
-| FoR-norm | Spec    | CGCNN    | 5.69  |
+| ASV17    | Spec    | CGCNN    | 11.16 |
+| BTAS16   | Spec    | LightCNN | 2.04  |
+| BTAS16   | Spec    | CGCNN    | 3.26  |
+| FoR-norm | Spec    | LightCNN | 5.43  |
+| FoR-norm | Spec    | CGCNN    | 18.64 |
 
 
 
