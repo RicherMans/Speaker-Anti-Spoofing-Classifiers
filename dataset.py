@@ -59,11 +59,13 @@ class MinimumOccupancySampler(tdata.Sampler):
          :param random_state: RandomState
          """
         self.labels = labels
-        data_samples, n_labels = labels.shape
+        assert labels.ndim == 1, "Only cross-entropy labels expected"
+        data_samples = labels.shape[0]
+        label_names = np.unique(labels)
         self.label_to_idx_list = []
         self.random_state = np.random.RandomState(seed=random_state)
-        for lb_idx in range(n_labels):
-            label_indexes = np.where(labels[:, lb_idx] == 1)[0]
+        for lb_idx in label_names:
+            label_indexes = np.where(labels == lb_idx)[0]
             self.random_state.shuffle(label_indexes)
             self.label_to_idx_list.append(label_indexes)
 
