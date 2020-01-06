@@ -94,8 +94,10 @@ class Runner(object):
                 np.stack(train_df['encoded'].values))
 
             sampling_kwargs = {"sampler": train_sampler, "shuffle": False}
-        else:
+        elif 'shuffle' in config_parameters and config_parameters['shuffle']:
             sampling_kwargs = {"shuffle": True}
+        else:
+            sampling_kwargs = {"shuffle": False}
 
         logger.info("Using Sampler {}".format(sampling_kwargs))
 

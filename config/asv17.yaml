@@ -15,4 +15,5 @@ loss_args: {}
 model: LightCNN
 model_args: {}
 sampler: {} # No extra sampling strategy
+shuffle: True
 outputpath: experiments/asv17/
