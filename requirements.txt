@@ -12,4 +12,4 @@ ignite==1.1.0
 librosa==0.7.1
 pypeln==0.1.10
 PyYAML==5.4
-scikit_learn==0.22
+scikit_learn==1.5.0
